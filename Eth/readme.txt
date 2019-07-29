@@ -36,9 +36,10 @@ $ geth --datadir "./ethereum/data" account list
   --networkid 1900            : 네트워크 아이디
   --nat "any"                 : 외부 주소와 내부 주소간 변화 처리
   --rpcapi "db, eth, net, web3, miner, personal" : 콘솔로 오픈이 되는 api 목록 web3=> js에서 사용가능
+  --allow-insecure-unlock      : 계좌 언락 허가 추가
   console                     : 콘솔 모드 오픈, 모든 출력은 콘솔로 진행
  
-$ geth --identity "PrivateNetwork" --datadir "./ethereum/data" --port "30303" --rpc --rpcaddr 0.0.0.0 --rpcport "8123" --rpccorsdomain "*" --nodiscover --networkid 1900 --nat "any" --rpcapi "db, eth, net, web3, miner, personal" console         
+$ geth --identity "PrivateNetwork" --datadir "./ethereum/data" --port "30303" --rpc --rpcaddr 0.0.0.0 --rpcport "8123" --rpccorsdomain "*" --nodiscover --networkid 1900 --nat "any" --rpcapi "db, eth, net, web3, miner, personal" --allow-insecure-unlock console         
 
 
 - 원격접속
@@ -65,15 +66,82 @@ $ nano Genesis.json
 
 
 3. 이더리움의 사설 네트워크 외부에서 연동하는 방법(PRC)
- - 전자지갑 구현
+- 전자지갑 구현
  1) RPC 접속을 통해서 명령을 전송하여 수행
  2) MIST 브라우저 (이더리움 GUI 툴) 수행
  3) node js 기반 client side에서 수행
  4) node js 기반 server side에서 수행 : restAPI
- 5) node js 기반 socket.io를 이용한 실시간 통신으로 수행
+ 5) node js 기반 socket.io를 이용한 실시간 통신으로 수행 : 소켓통신
+- 원격 접속상황에서 
+  -> 계좌 생성
+  $ personal.newAccount('1234')
+  "0x387cf904da0f110763645243c68fb675e1b6406e"
+  -> 송금 행위 
+     -> 트렌젝션(마이닝 작업을 통해 처리가 된다)
+     -> 여기에는 이런 행위가 적합한지 블록체인의 참여자(노드)들의 합의 원칙에 따라 검증 후 ok되면 장부에 기록이 되고
+       그 때 돈이 들어오게 된다
+  Error: authentication needed: password or unlock( 계정을 풀지 않고 송금행위를 진행했을 경우 뜨는 에러)
+  => 트렌젝션 수행을 위해(수수료가 발생되거나 , 송금행위 등 비용이 발생하는) 발생자(from)
+  의 계정을 풀고 (비번을 입력받는다)진행시켜야 한다.
+  $ personal.unlockAccount(eth.accounts[0] , '1234')
+  true
+  $ eth.sendTransaction ({
+    from:eth.accounts[0],
+    to:eth.accounts[1],
+    value: web3.toWei(1, 'ether')
+  })    
+  "0x5dbbd04de2fd8d6707bcea1f43a40dc4fe39a5da75516270c6a168ed0824e82b"
+  트렌젝션 확인
+  $ eth.pendingTransactions
+  송금행위를 처리하기 위해 miner.start()
+  miner.start() 평소에는 계속해서 가동중이기 때문에 여기서는 필요할 때만 구동하고 , 멈추는 식으로 처리
+  $ miner.start()
+
+
+- 화폐단위
+  1 ether = 1,000,000,000,000,000,000 wei (wei: 수수료 지급용)
+            wei < Kwei < Mwei < Gwei 
+  1 ether = 1,000,000,000 Gwei (가장 일반적인 가스 지급 단위)
+  1 ether = 1,000,000 Szabo (수수료 지급용)
+  1 ether = 1,000 Finney (소액 결제용)
+  1 ether = 0.001 Kether
+            Kether < Mether < Gehter < Tether
+
+- MIST 브라우저
+ -> 이더리움 사용/ 테스트/ 사설 네트워크에 모두 접속 가능
+ -> 네트워크 구동이 없는 상태에서 접속하면 무조건 상용으로 붙게되고 노드가 동기화되면서
+  저장 데이터가 커지고, 로드가 많이 걸린다(주의)
+ -> 구동전에 반드시 사설 네트워크를 가동시킨후에 구동한다
+ -> https://github.com/ethereum/mist/releases
+ -> Mist-installer-0-11-1.exe 다운
+ -> 계좌 생성, 송금, 트렌젝션처리 확인
+ -> 스마트 컨트렉트 빌드 -> 배포하는 위치도 확인
+- NodeJs 연동
+ -> 노드 프로젝트에서 web3를 설치
+ $ npm install web3@0.16.0
+ -> 프로젝트 생성
+ $ cd C:\Users\501_3\Desktop\test_git\bc_projects\Eth\DApp
+ $ express -e mini_wallet
+ $ cd mini_wallet
+ $ npm install
+ $ npm install web3@0.16.0
+ $ package.json에서 node ./bin/www => nodemon ./bin/www
+ $ npm start 
+ web3는 이더리움 네트워크에 접속하여 RPC 커맨드를  사용할 수 있다
+사용관연 api는 네트워크 가동시 허가된 모듈만 사용가능
+[클라이언트 side에서 사용을 위해]
+ node_modules/web3/dist/web3-light.min.js 이파일을 
+ public/lib(새로생성)/web3-light.min.js
+ node_modules/web3/dist/bignumber.min.js 이파일을 
+ public/lib(새로생성)/bignumber.min.js
+ -> 코드에서 확인 -> index.ejs로 이동
+
+
+
+
 
 4. 솔리디티 언어 이해 (이더리움 네트워크 상에 프로그램이 가미된 앱을 개발하는 언어)
-
+  - 에디타 : remix 
 5. DApp 구성 (Node 기반, 사설네트워크 + node 서비스 )
   - 전자지갑
   - 전자투표
